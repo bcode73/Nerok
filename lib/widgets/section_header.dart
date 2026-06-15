@@ -17,7 +17,7 @@ class SectionHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(title, style: AppType.title)),
-          ?trailing,
+          trailing ?? const SizedBox.shrink(),
         ],
       ),
     );

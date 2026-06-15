@@ -9,8 +9,11 @@ import '../models/app_settings.dart';
 import '../models/catalog_item.dart';
 import '../models/enums.dart';
 import '../models/medication.dart';
+import '../services/ai_analysis_service.dart';
 import '../services/notification_service.dart';
 import '../services/pdf_service.dart';
+import 'episodes_provider.dart';
+import 'insights_provider.dart';
 
 /// Provides the initialised [HiveService]. Overridden in `main()` with the
 /// instance created after Hive has finished opening its boxes.
@@ -45,6 +48,35 @@ final backupServiceProvider = Provider<BackupService>((ref) {
 final pdfServiceProvider = Provider<PdfService>((ref) {
   return PdfService(ref.watch(catalogRepositoryProvider));
 });
+
+final aiAnalysisServiceProvider = Provider<AiAnalysisService>((ref) {
+  final service = AiAnalysisService();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+/// On-demand DeepSeek analysis for a given range (in days). Starts as `null`
+/// (not generated); call `.notifier.generate()` to fetch. Network + paid, so
+/// it never runs automatically.
+class AiAnalysisController
+    extends AutoDisposeFamilyAsyncNotifier<String?, int> {
+  @override
+  Future<String?> build(int arg) async => null;
+
+  Future<void> generate() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final insights = ref.read(reportInsightsProvider(arg));
+      final episodes = ref.read(episodesProvider);
+      final payload =
+          AiAnalysisService.buildPayload(insights, episodes, arg);
+      return ref.read(aiAnalysisServiceProvider).analyze(payload);
+    });
+  }
+}
+
+final aiAnalysisProvider = AsyncNotifierProvider.autoDispose
+    .family<AiAnalysisController, String?, int>(AiAnalysisController.new);
 
 // --- Catalog (reactive lists) ---
 
@@ -160,6 +192,10 @@ class SettingsNotifier extends Notifier<AppSettings> {
     } else {
       await notifications.cancelDailyReminder();
     }
+  }
+
+  Future<void> setAiEnabled(bool enabled) async {
+    await update(state.copyWith(aiEnabled: enabled));
   }
 
   Future<void> setPatientName(String? name) async {

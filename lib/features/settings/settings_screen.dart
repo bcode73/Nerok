@@ -8,6 +8,7 @@ import '../../theme/dimens.dart';
 import '../../theme/typography.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/upsell_lock.dart';
+import '../common/ai_consent.dart';
 import 'backup_actions.dart';
 import 'manage_catalog_screen.dart';
 import 'manage_medications_screen.dart';
@@ -101,10 +102,31 @@ class SettingsScreen extends ConsumerWidget {
                       : showPaywall(context),
                 ),
                 const _Divider(),
+                SettingsTile(
+                  icon: Icons.auto_awesome,
+                  title: 'Deep analysis (AI)',
+                  subtitle: !isPro
+                      ? 'Pro — AI written summary of your data'
+                      : settings.aiEnabled
+                          ? 'On · anonymised summaries sent to DeepSeek'
+                          : 'Off · data stays on this iPhone',
+                  locked: !isPro,
+                  trailing: isPro
+                      ? Switch(
+                          value: settings.aiEnabled,
+                          activeThumbColor: AppColors.accent,
+                          onChanged: (v) => _toggleAi(context, ref, v),
+                        )
+                      : null,
+                  onTap: isPro ? null : () => showPaywall(context),
+                ),
+                const _Divider(),
                 const SettingsTile(
                   icon: Icons.lock_outline,
                   title: 'Privacy',
-                  subtitle: 'Everything stays on this iPhone',
+                  subtitle:
+                      'Your data stays on this iPhone, except the optional '
+                      'AI analysis you turn on',
                 ),
               ],
             ),
@@ -180,6 +202,16 @@ class SettingsScreen extends ConsumerWidget {
           hour: picked.hour,
           minute: picked.minute,
         );
+  }
+
+  Future<void> _toggleAi(
+      BuildContext context, WidgetRef ref, bool enabled) async {
+    if (enabled) {
+      // Re-use the shared consent flow, which sets the flag on accept.
+      await ensureAiConsent(context, ref);
+    } else {
+      await ref.read(settingsProvider.notifier).setAiEnabled(false);
+    }
   }
 
   Future<void> _restore(BuildContext context, WidgetRef ref) async {

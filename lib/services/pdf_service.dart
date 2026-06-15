@@ -27,6 +27,7 @@ class PdfService {
     required Insights insights,
     required String rangeLabel,
     String? patientName,
+    String? aiAnalysis,
   }) async {
     final doc = pw.Document();
     final df = DateFormat('d MMM yyyy');
@@ -61,6 +62,10 @@ class PdfService {
           _header(patientName, rangeLabel, generated, df),
           pw.SizedBox(height: 18),
           _summaryTiles(insights),
+          if (aiAnalysis != null && aiAnalysis.trim().isNotEmpty) ...[
+            pw.SizedBox(height: 18),
+            _analysisSection(aiAnalysis.trim()),
+          ],
           pw.SizedBox(height: 18),
           _weeklyChart(insights),
           pw.SizedBox(height: 18),
@@ -155,6 +160,34 @@ class PdfService {
               ),
             ),
           ),
+      ],
+    );
+  }
+
+  pw.Widget _analysisSection(String text) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Analysis'),
+        pw.SizedBox(height: 8),
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(
+            color: _band,
+            borderRadius: pw.BorderRadius.circular(8),
+          ),
+          child: pw.Text(
+            text,
+            style: pw.TextStyle(fontSize: 9.5, color: _ink, lineSpacing: 2.5),
+          ),
+        ),
+        pw.SizedBox(height: 4),
+        pw.Text(
+          'AI-generated summary of the patient\'s own tracked data. '
+          'For discussion only — not a diagnosis.',
+          style: pw.TextStyle(fontSize: 7, color: _muted),
+        ),
       ],
     );
   }

@@ -22,13 +22,14 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       reminderHour: fields[2] as int,
       reminderMinute: fields[3] as int,
       patientName: fields[4] as String?,
+      aiEnabled: fields[5] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, AppSettings obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.onboardingDone)
       ..writeByte(1)
@@ -38,7 +39,9 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       ..writeByte(3)
       ..write(obj.reminderMinute)
       ..writeByte(4)
-      ..write(obj.patientName);
+      ..write(obj.patientName)
+      ..writeByte(5)
+      ..write(obj.aiEnabled);
   }
 
   @override

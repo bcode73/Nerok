@@ -22,12 +22,18 @@ class AppSettings {
   @HiveField(4)
   String? patientName;
 
+  /// Opt-in consent: the user has agreed that aggregated data may be sent to
+  /// the DeepSeek analysis service (via the Firebase proxy). Off by default.
+  @HiveField(5)
+  bool aiEnabled;
+
   AppSettings({
     this.onboardingDone = false,
     this.reminderEnabled = false,
     this.reminderHour = 20,
     this.reminderMinute = 0,
     this.patientName,
+    this.aiEnabled = false,
   });
 
   AppSettings copyWith({
@@ -37,6 +43,7 @@ class AppSettings {
     int? reminderMinute,
     String? patientName,
     bool clearPatientName = false,
+    bool? aiEnabled,
   }) {
     return AppSettings(
       onboardingDone: onboardingDone ?? this.onboardingDone,
@@ -44,6 +51,7 @@ class AppSettings {
       reminderHour: reminderHour ?? this.reminderHour,
       reminderMinute: reminderMinute ?? this.reminderMinute,
       patientName: clearPatientName ? null : (patientName ?? this.patientName),
+      aiEnabled: aiEnabled ?? this.aiEnabled,
     );
   }
 
@@ -53,6 +61,7 @@ class AppSettings {
         'reminderHour': reminderHour,
         'reminderMinute': reminderMinute,
         'patientName': patientName,
+        'aiEnabled': aiEnabled,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -61,5 +70,6 @@ class AppSettings {
         reminderHour: json['reminderHour'] as int? ?? 20,
         reminderMinute: json['reminderMinute'] as int? ?? 0,
         patientName: json['patientName'] as String?,
+        aiEnabled: json['aiEnabled'] as bool? ?? false,
       );
 }

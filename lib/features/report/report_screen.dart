@@ -16,6 +16,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/upsell_lock.dart';
+import '../common/ai_consent.dart';
 
 enum _Range {
   d30(30, '30 days'),
@@ -37,6 +38,7 @@ class ReportScreen extends ConsumerStatefulWidget {
 class _ReportScreenState extends ConsumerState<ReportScreen> {
   _Range _range = _Range.d90;
   bool _exporting = false;
+  bool _includeAi = false;
 
   List<Episode> _episodesInRange() {
     final all = ref.read(episodesProvider);
@@ -59,6 +61,11 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     }
   }
 
+  String? _aiText() {
+    if (!_includeAi) return null;
+    return ref.read(aiAnalysisProvider(_range.days)).valueOrNull;
+  }
+
   Future<Uint8List> _buildBytes() {
     final pdf = ref.read(pdfServiceProvider);
     final insights = ref.read(reportInsightsProvider(_range.days));
@@ -68,7 +75,20 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
       insights: insights,
       rangeLabel: _rangeLabel,
       patientName: settings.patientName,
+      aiAnalysis: _aiText(),
     );
+  }
+
+  Future<void> _toggleAi(bool enabled) async {
+    if (!enabled) {
+      setState(() => _includeAi = false);
+      return;
+    }
+    final ok = await ensureAiConsent(context, ref);
+    if (!ok) return;
+    setState(() => _includeAi = true);
+    // Generate (or reuse) the analysis for this range, then refresh preview.
+    await ref.read(aiAnalysisProvider(_range.days).notifier).generate();
   }
 
   @override
@@ -114,15 +134,31 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
   }
 
   Widget _buildReport() {
+    // Watch so the preview rebuilds when the analysis arrives.
+    final aiState = ref.watch(aiAnalysisProvider(_range.days));
+    final aiReady = _includeAi && aiState.hasValue && aiState.value != null;
+    // Key forces PdfPreview to regenerate when inputs change.
+    final previewKey = ValueKey('${_range.days}_${_includeAi}_$aiReady');
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(AppSpace.lg),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpace.lg, AppSpace.lg, AppSpace.lg, AppSpace.sm),
           child: _RangeSelector(
             value: _range,
             onChanged: (r) => setState(() => _range = r),
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+          child: _AiToggle(
+            value: _includeAi,
+            state: aiState,
+            onChanged: _toggleAi,
+          ),
+        ),
+        const SizedBox(height: AppSpace.sm),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
@@ -131,6 +167,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadii.input),
                 child: PdfPreview(
+                  key: previewKey,
                   build: (_) => _buildBytes(),
                   canChangePageFormat: false,
                   canChangeOrientation: false,
@@ -154,6 +191,70 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AiToggle extends StatelessWidget {
+  const _AiToggle({
+    required this.value,
+    required this.state,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final AsyncValue<String?> state;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final loading = value && state.isLoading;
+    final error = value && state.hasError;
+    final subtitle = error
+        ? state.error.toString()
+        : loading
+            ? 'Generating analysis…'
+            : 'Add an AI written summary to the PDF';
+
+    return AppCard(
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.lg, vertical: AppSpace.sm),
+      child: Row(
+        children: [
+          const Icon(Icons.auto_awesome, color: AppColors.accent, size: 20),
+          const SizedBox(width: AppSpace.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Include AI analysis', style: AppType.bodyHi),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: AppType.caption.copyWith(
+                    color: error ? AppColors.accent : AppColors.textLow,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (loading)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.accent),
+            )
+          else
+            Switch(
+              value: value,
+              activeThumbColor: AppColors.accent,
+              onChanged: onChanged,
+            ),
+        ],
+      ),
     );
   }
 }

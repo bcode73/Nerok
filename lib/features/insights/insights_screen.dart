@@ -13,6 +13,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/stat_tile.dart';
 import '../../widgets/upsell_lock.dart';
+import 'widgets/ai_analysis_card.dart';
 import 'widgets/episodes_bar_chart.dart';
 import 'widgets/top_triggers.dart';
 
@@ -76,6 +77,8 @@ class InsightsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: AppSpace.lg),
+          const AiAnalysisCard(days: 90),
         ],
       ),
     );
