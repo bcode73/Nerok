@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'data/hive_service.dart';
 import 'providers/providers.dart';
+import 'services/firebase_service.dart';
 import 'services/notification_service.dart';
 import 'services/revenuecat_service.dart';
 
@@ -12,6 +13,9 @@ Future<void> main() async {
 
   final hive = HiveService();
   await hive.init();
+
+  // Best-effort: enables App Check for the AI analysis proxy when configured.
+  await FirebaseService.initialize();
 
   final notifications = NotificationService();
   await notifications.init();

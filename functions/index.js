@@ -17,11 +17,19 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
+import { initializeApp } from "firebase-admin/app";
+import { getAppCheck } from "firebase-admin/app-check";
+
+initializeApp();
 
 const DEEPSEEK_API_KEY = defineSecret("DEEPSEEK_API_KEY");
-// Optional lightweight gate against random callers. For real protection, add
-// Firebase App Check.
+// Optional extra gate on top of App Check. For most setups App Check alone is
+// enough; leave this unset to skip it.
 const APP_SHARED_SECRET = defineSecret("APP_SHARED_SECRET");
+
+// Primary abuse protection: require a valid Firebase App Check token. Set to
+// false only for local testing without App Check.
+const REQUIRE_APP_CHECK = true;
 
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 // "deepseek-reasoner" gives deeper, reasoned analysis; swap to "deepseek-chat"
@@ -70,6 +78,23 @@ export const analyzeHeadaches = onRequest(
       return;
     }
 
+    // 1) Firebase App Check — attest the request came from a genuine app build.
+    const appCheckToken = req.get("X-Firebase-AppCheck");
+    if (REQUIRE_APP_CHECK) {
+      if (!appCheckToken) {
+        res.status(401).json({ error: "Missing App Check token" });
+        return;
+      }
+      try {
+        await getAppCheck().verifyToken(appCheckToken);
+      } catch (err) {
+        logger.warn("Invalid App Check token", err?.message);
+        res.status(401).json({ error: "Invalid App Check token" });
+        return;
+      }
+    }
+
+    // 2) Optional shared secret on top of App Check.
     const expectedSecret = APP_SHARED_SECRET.value();
     if (expectedSecret && req.get("x-app-secret") !== expectedSecret) {
       res.status(401).json({ error: "Unauthorized" });

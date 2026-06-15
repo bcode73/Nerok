@@ -57,11 +57,23 @@ class AiAnalysisService {
     };
   }
 
-  /// Returns the analysis text, or throws on failure.
-  Future<String> analyze(Map<String, dynamic> payload) async {
+  /// Returns the analysis text, or throws on failure. [appCheckToken] attests
+  /// the request to the proxy; pass null when App Check isn't configured.
+  Future<String> analyze(
+    Map<String, dynamic> payload, {
+    String? appCheckToken,
+  }) async {
     if (!isConfigured) {
       throw const AiAnalysisException(
           'Analysis is not set up yet. Add the Firebase function URL.');
+    }
+
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (!appSecret.startsWith('TODO')) {
+      headers['x-app-secret'] = appSecret;
+    }
+    if (appCheckToken != null) {
+      headers['X-Firebase-AppCheck'] = appCheckToken;
     }
 
     final http.Response response;
@@ -69,13 +81,10 @@ class AiAnalysisService {
       response = await _client
           .post(
             Uri.parse(endpoint),
-            headers: {
-              'Content-Type': 'application/json',
-              if (!appSecret.startsWith('TODO')) 'x-app-secret': appSecret,
-            },
+            headers: headers,
             body: jsonEncode({'data': payload}),
           )
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(seconds: 90));
     } on TimeoutException {
       throw const AiAnalysisException('The analysis timed out. Try again.');
     } catch (_) {

@@ -10,6 +10,7 @@ import '../models/catalog_item.dart';
 import '../models/enums.dart';
 import '../models/medication.dart';
 import '../services/ai_analysis_service.dart';
+import '../services/firebase_service.dart';
 import '../services/notification_service.dart';
 import '../services/pdf_service.dart';
 import 'episodes_provider.dart';
@@ -70,7 +71,10 @@ class AiAnalysisController
       final episodes = ref.read(episodesProvider);
       final payload =
           AiAnalysisService.buildPayload(insights, episodes, arg);
-      return ref.read(aiAnalysisServiceProvider).analyze(payload);
+      final token = await FirebaseService.appCheckToken();
+      return ref
+          .read(aiAnalysisServiceProvider)
+          .analyze(payload, appCheckToken: token);
     });
   }
 }
