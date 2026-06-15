@@ -1,0 +1,62 @@
+# Codemagic CI/CD for Nerok — builds the iOS app on a Mac instance and ships to
+# TestFlight. No local Mac required.
+#
+# One-time setup in the Codemagic UI:
+#   1. Teams/App settings → Integrations → App Store Connect: add your App Store
+#      Connect API key (Issuer ID, Key ID, .p8). Name it, then put that name in
+#      `integrations.app_store_connect` below.
+#   2. Set the env var APP_STORE_APP_ID to your app's numeric Apple ID
+#      (App Store Connect → your app → App Information → "Apple ID").
+#
+# Signing is fully automatic via the App Store Connect API key — no manual
+# certificates or provisioning profiles to manage.
+
+workflows:
+  ios-testflight:
+    name: Nerok iOS → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      # TODO(samuel): match the name you gave the App Store Connect integration.
+      app_store_connect: Nerok App Store Connect
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.nerok.app
+      vars:
+        BUNDLE_ID: "com.nerok.app"
+        # TODO(samuel): your app's numeric Apple ID (used to auto-increment the
+        # TestFlight build number).
+        APP_STORE_APP_ID: 0000000000
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Generate Hive adapters
+        script: dart run build_runner build --delete-conflicting-outputs
+      - name: Static analysis
+        script: flutter analyze
+      - name: Run tests
+        script: flutter test
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Build IPA for App Store
+        script: |
+          BUILD_NUMBER=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" 2>/dev/null || echo 0) + 1))
+          flutter build ipa --release \
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # Adds the build to your internal testers automatically. Replace with
+        # your actual group name(s), or remove to just upload to TestFlight.
+        beta_groups:
+          - Internal Testers
